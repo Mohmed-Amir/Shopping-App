@@ -1,0 +1,36 @@
+﻿@page "/"
+@inject NavigationManager navManager;
+@inject ProtectedSessionStorage sessionStorage;
+
+@if (IsAdminLoggedIn == true)
+{
+    <h1>Hello, Admin!</h1>
+    <span>Welcome to Admin Panel</span>
+}
+
+
+@code{
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+    public bool IsAdminLoggedIn = false;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await notify.InvokeAsync();
+
+            var adminSession = await sessionStorage.GetAsync<string>("adminKey");
+            if (adminSession.Success)
+            {
+                IsAdminLoggedIn = true;
+                StateHasChanged();
+            }
+            else
+            {
+                navManager.NavigateTo("/login");
+            }
+        }
+    }
+}

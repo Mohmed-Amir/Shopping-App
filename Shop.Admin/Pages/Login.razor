@@ -1,0 +1,104 @@
+﻿@page "/login"
+@using Shop.DataModels.CustomModels;
+@using Shop.Admin.Services;
+@inject IAdminPanelService adminPanelService;
+@inject NavigationManager navManager;
+@inject ProtectedSessionStorage sessionStorage;
+
+<style>
+
+    .container {
+     height : 50px;
+    }
+
+</style>
+<section class="vh-100 gradient-custom">
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col-12 col-md-10 col-lg-5 col-xl-5">
+                <div class="card bg-dark text-white" style="border-radius: 1rem;">
+                    <div class="card-body p-5 text-center">
+
+                        <div class="mb-md-5 mt-md-4 pb-5">
+                            <h4 class="fw-bold mb-2">Hi Doctor ..</h4>
+                            <p class="text-white-50 mb-">Please enter your email and password!</p>
+                            @if (loginModel != null)
+                            {
+                            <EditForm Model="@loginModel" OnValidSubmit="Login_Click">
+                                <DataAnnotationsValidator />
+                                <div class="form-outline form-white m-2 p-2">
+                                    <InputText type="email" name="email" placeholder="Email" class="email form-control-lg" @bind-Value="loginModel.EmailId" autocomplete="off" />
+                                    <ValidationMessage For="@(() => loginModel.EmailId)" />
+
+                                </div>
+                                <div class="form-outline form-white mb-2">
+                                    <InputText type="password" name="password" placeholder="Password" class="password form-control-lg" @bind-Value="loginModel.Password" />
+                                    <ValidationMessage For="@(() => loginModel.Password)" />
+
+                                </div>
+                                <br />
+
+                                <p class="small pb-lg-2"><a class="text-white-50" href="#!">Forgot password?</a></p>
+                                <br />
+                                <button class="btn btn-outline-light btn-lg px-5" type="submit">Login</button>
+                                <br /><br /><br />
+
+                                <div>
+                                    <p class="">Can't login ? <a href="#!" class="text-white-50 fw-bold">Ask the manager ..</a></p>
+                                </div>
+                            </EditForm>
+                            }
+
+                        <div>
+                            <p style="color: #e52e50">
+                                <br />
+                                <h4> @alertMessage </h4>
+                            </p>
+                        </div>
+
+                        </div>
+
+
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+
+
+
+@code {
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+    public LoginModel loginModel { get; set; }
+    public string alertMessage { get; set; }
+
+    protected override Task OnInitializedAsync()
+    {
+        loginModel = new LoginModel();
+        return base.OnInitializedAsync();
+    }
+
+    private async Task Login_Click()
+    {
+        var response = await adminPanelService.AdminLogin(loginModel);
+        if (response.Status == true)
+        {
+            var user_response = response.Message.Split("|");
+            await sessionStorage.SetAsync("adminKey", user_response[0]);
+            await sessionStorage.SetAsync("adminName", user_response[1]);
+            await sessionStorage.SetAsync("adminEmail", user_response[2]);
+            await notify.InvokeAsync();
+            navManager.NavigateTo("/");
+        }
+        else
+        {
+            alertMessage = response.Message;
+        }
+    }
+}

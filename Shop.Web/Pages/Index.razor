@@ -1,0 +1,264 @@
+﻿@page "/"
+@using Shop.DataModels.CustomModels;
+@using Shop.Web.Services;
+@inject IUserPanelService userPanelService
+@inject ProtectedSessionStorage sessionStorage;
+@inject NavigationManager navManager;
+
+
+<style>
+
+    .column {
+        float: left;
+        padding: 15px;
+        margin-bottom:auto;
+        width:100px;
+    }
+
+    .clearfix::after {
+        content: "";
+        clear: both;
+        display: table;
+    }
+
+    .menu {
+        width: 25%;
+        margin-top: 10px;
+        border: 1px outset #808080;
+        border-radius: 7px;
+        background: #176b90;
+        color: White;
+    }
+
+    .content {
+        width: 75%;
+    }
+
+    .menu ul {
+        list-style-type: none;
+        margin: 0;
+        padding: 0;
+    }
+
+    .menu li {
+        padding: 8px;
+        margin-bottom: 8px;
+        color: black;
+        background-color: white;
+    }
+
+        .menu li:hover {
+            background-color: #e7e4e4;
+            color: #808080;
+        }
+
+    .stuff {
+        padding: 8px;
+        margin: 1px;
+        background-color: white;
+        border: 1px outset black;
+    }
+
+    .add-to-cart {
+        border: 1px outset #808080;
+        width: 100%;
+        background-color: #d17026;
+        color: white;
+    }
+</style>
+
+<div style="min-height:500px;">
+
+    <div class="column menu">
+        @if (categories == null)
+        {
+            <span>Empty</span>
+        }
+        else
+        { <div style="text-align:center;"><h5>Available List</h5></div>
+            <ul>
+                @foreach (var category in categories)
+                {
+                    <li style="cursor:pointer;" @onclick="(() => LoadProductByCategory(category))">@category.Name</li>
+                }
+            </ul>
+        }
+    </div>
+    <div class="column content">
+        @if (products == null)
+        {
+            <span>sorry , Our inventory is empty!</span>
+        }
+        else
+        {
+            <div class="container">
+                <div style="padding:5px 0px 0px 0px;border-bottom:1px black;margin-bottom:5px;">
+                    <h5>- @categoryName category</h5>
+                </div>
+                <div class="row">
+                    @foreach (var prod in products)
+                    {
+                        <div class="col-md-4">
+                            <div class="col-md-12 stuff">
+                                <div style="width:100%;border-radius: 2px;background-color:white;">
+                                    <button type="button" class="btn" style="border:2px #cff7f9 inset;width:100%;">@prod.Name</button>
+                                    <img src="http://localhost:38956/@prod.ImageUrl" style="width:100%;height:150px;border-radius: 1px;">
+
+                                    <div>
+                                        Price:&nbsp;₹@prod.Price &nbsp;&nbsp;<span style="color:red;"> Stock:&nbsp;@prod.Stock</span>
+                                    </div>
+                                    @if (@prod.CartFlag)
+                                    {
+                                        <button type="button" class="btn add-to-cart" style="background-color:#ffd800;" @onclick="(() => AddToCart_Click(prod))">Remove from Cart</button>
+                                    }
+                                    else
+                                    {
+                                        <button type="button" class="btn add-to-cart" @onclick="(() => AddToCart_Click(prod))">Add to MedKit</button>
+                                    }
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+    </div>
+
+</div>
+
+@code{
+
+    public List<CategoryModel> categories { get; set; }
+    public List<ProductModel> products { get; set; }
+    public string categoryName = string.Empty;
+    public bool cartFlag = false;
+    public List<CartModel> myCart { get; set; }
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await GetCatgories();
+    }
+
+    private async Task GetCatgories()
+    {
+        categories = await userPanelService.GetCategories();
+        if (categories != null && categories.Count > 0)
+        {
+            await LoadProductByCategory(categories.FirstOrDefault());
+        }
+    }
+
+    private async Task LoadProductByCategory(CategoryModel category)
+    {
+        categoryName = category.Name;
+        products = await userPanelService.GetProductByCategoryId(category.Id);
+        if (products != null && products.Count > 0)
+        {
+            await updateCartText();
+        }
+    }
+
+    private async Task AddToCart_Click(ProductModel productClicked)
+    {
+        cartFlag = true;
+        var result = await sessionStorage.GetAsync<List<CartModel>>("myCart");
+
+        if (!result.Success)
+        {
+            myCart = new List<CartModel>();
+
+            if (productClicked.CartFlag)
+            {
+                var existing_product = myCart.Where(x => x.ProductId == productClicked.Id).FirstOrDefault();
+                if (existing_product != null)
+                {
+                    myCart.Remove(existing_product);
+                    await sessionStorage.SetAsync("myCart", myCart);
+                }
+            }
+            else
+            {
+                CartModel cm = new CartModel();
+                cm.ProductId = productClicked.Id;
+                cm.Quantity = 1;
+                cm.AvailableStock = Convert.ToInt32(productClicked.Stock);
+                cm.ProductName = productClicked.Name;
+                cm.ProductImage = productClicked.ImageUrl;
+                cm.Price = Convert.ToInt32(productClicked.Price);
+                myCart.Add(cm);
+
+                await sessionStorage.SetAsync("myCart", myCart);
+            }
+        }
+        else
+        {
+            myCart = result.Value;
+
+            if (productClicked.CartFlag)
+            {
+                var existing_product = myCart.Where(x => x.ProductId == productClicked.Id).FirstOrDefault();
+                if (existing_product != null)
+                {
+                    myCart.Remove(existing_product);
+                    await sessionStorage.SetAsync("myCart", myCart);
+                }
+            }
+            else
+            {
+                CartModel cm = new CartModel();
+                cm.ProductId = productClicked.Id;
+                cm.Quantity = 1;
+                cm.AvailableStock = Convert.ToInt32(productClicked.Stock);
+                cm.ProductName = productClicked.Name;
+                cm.ProductImage = productClicked.ImageUrl;
+                cm.Price = Convert.ToInt32(productClicked.Price);
+                myCart.Add(cm);
+
+                await sessionStorage.SetAsync("myCart", myCart);
+            }
+        }
+
+        await updateCartText();
+        await notify.InvokeAsync();
+    }
+
+    private async Task updateCartText()
+    {
+        if (cartFlag)
+        {
+            var result = await sessionStorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                foreach (var _product in products)
+                {
+                    _product.CartFlag = false;
+                }
+
+                myCart = result.Value;
+                foreach (var cart in myCart)
+                {
+                    var cartProd = products.Where(x => x.Id == cart.ProductId).FirstOrDefault();
+                    if (cartProd != null)
+                    {
+                        cartProd.CartFlag = true;
+                    }
+                }
+            }
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var result = await sessionStorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                cartFlag = true;
+            }
+        }
+    }
+}

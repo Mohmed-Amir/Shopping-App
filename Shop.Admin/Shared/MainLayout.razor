@@ -1,0 +1,59 @@
+﻿@inherits LayoutComponentBase
+@inject ProtectedSessionStorage sessionStorage;
+@inject NavigationManager navManager;
+
+<div class="page">
+
+    @if (IsAdminLoggedIn)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
+
+    <div class="main">
+
+        @if (IsAdminLoggedIn)
+        {
+            <div class="top-row px-4">
+                <a href="#" @onclick="Logout">Logout</a>
+            </div>
+        }
+
+        <div class="content px-4">
+            <CascadingValue Value="event_notify">
+                @Body
+            </CascadingValue>
+        </div>
+
+    </div>
+</div>
+
+@code{
+
+    public bool IsAdminLoggedIn = false;
+    EventCallback event_notify => EventCallback.Factory.Create(this, NotifyLayout);
+
+    public async void Logout()
+    {
+        await sessionStorage.DeleteAsync("adminKey");
+        await NotifyLayout();
+        navManager.NavigateTo("/login");
+    }
+
+    private async Task NotifyLayout()
+    {
+        var adminSession = await sessionStorage.GetAsync<string>("adminKey");
+        if (adminSession.Success)
+        {
+            IsAdminLoggedIn = true;
+        }
+        else
+        {
+            IsAdminLoggedIn = false;
+            navManager.NavigateTo("/login");
+        }
+    }
+
+   
+}

@@ -1,0 +1,302 @@
+﻿@page "/mycart"
+@using Shop.DataModels.CustomModels;
+@using Shop.Web.Services;
+@inject ProtectedSessionStorage sessionStorage;
+@inject IUserPanelService userPanelService
+@inject NavigationManager navManager;
+
+<style>
+
+    .small-container {
+        max-width: 1080px;
+        margin: auto;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    .cart-page {
+        margin: 20px auto;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .cart-info {
+        display: flex;
+        flex-wrap: wrap;
+    }
+
+    th {
+        text-align: left;
+        padding: 5px;
+        color: #ffffff;
+        background: #808080;
+        font-weight: normal;
+    }
+
+    td {
+        padding: 10px 5px;
+    }
+
+        td input {
+            width: 40px;
+            height: 30px;
+            padding: 5px;
+        }
+
+        td a {
+            color: #ff523b;
+            font-size: 12px;
+        }
+
+        td img {
+            width: 80px;
+            height: 80px;
+            margin-right: 10px;
+        }
+
+    .total-price {
+        display: flex;
+        justify-content: flex-end;
+    }
+
+        .total-price table {
+            border-top: 3px solid #ff523b;
+            width: 100%;
+            max-width: 400px;
+        }
+
+    td:last-child {
+        text-align: right;
+    }
+
+    th:last-child {
+        text-align: right;
+    }
+</style>
+
+<div style="padding:10px 0px 0px 10px; text-align:right;">
+    @if (@userName != null && @userEmail != null)
+    {
+        <span>
+            <span style="border:1px ridge #ff523b;background-color:#ff6a00;border-radius:10px;color:#ffffff;padding:3px;">My MedKit</span>
+            &nbsp;&nbsp;
+            <b>
+                Name : @userName
+                &nbsp;&nbsp;
+                Email : @userEmail
+                &nbsp;&nbsp;
+            </b>
+        </span>
+    }
+    @if (@myCart != null && @myCart.Count > 0)
+    {
+        <button type="button" value="Clear" class="btn btn-primary" @onclick="@Clear_Click">Clear</button>
+    }
+
+</div>
+
+<div class="small-container cart-page">
+    @if (@myCart != null && @myCart.Count > 0)
+    {
+        <table>
+            <tr>
+                <th>Product</th>
+                <th>Remove</th>
+                <th>Price</th>
+                <th>Quantity</th>
+                <th>Subtotal</th>
+            </tr>
+            @foreach (var cart in myCart)
+            {
+                <tr>
+                    <td>
+                        <div class="cart-info">
+                            <img src="http://localhost:38956/@cart.ProductImage" alt="Product Photo" />
+                            <div>
+                                <p>@cart.ProductName</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td><a @onclick="(() => RemoveFromCart_Click(cart))" style="cursor:pointer;">Remove</a></td>
+                    <td>₹@cart.Price</td>
+                    <td><input type="number" @bind="cart.Quantity" min="1" max="@cart.AvailableStock" @onclick="@onQuantityChange" style="width:60px;" /></td>
+                    <td>₹@(cart.Price*cart.Quantity).00</td>
+                </tr>
+            }
+        </table>
+
+        <div class="total-price">
+            <table>
+                <tr>
+                    <td>Subtotal</td>
+                    <td>
+                        ₹@subTotal.00
+                    </td>
+                </tr>
+                <tr>
+                    <td>Shipping Charges</td>
+                    <td>₹@shippingCharges.00</td>
+                </tr>
+                <tr>
+                    <td>Total</td>
+                    <td>₹@finalTotal.00</td>
+                </tr>
+                <tr>
+                    <td>Shipping Address</td>
+                    <td>
+                        <textarea rows="3" cols="30" name="shippingaddress" placeholder="Shipping Address" @bind="shippingAddress">
+                        </textarea>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Payment Mode  </td>
+                    <td>
+                        @paymentMode
+                    </td>
+                </tr>
+                <tr>
+                    <td></td>
+                    <td>
+                        <button type="button" value="Checkout" class="btn btn-primary" @onclick="@Checkout_Click">Checkout</button>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    }
+    else
+    {
+        <hr />
+        <div style="text-align:center;">
+            <img src="./images/empty.jpg" />
+        </div>
+    }
+</div>
+
+
+@code {
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+    public List<CartModel> myCart { get; set; }
+    public string shippingAddress { get; set; }
+    public string paymentMode { get; set; }
+    public int subTotal { get; set; }
+    public int shippingCharges { get; set; }
+    public int finalTotal { get; set; }
+
+    public string userName { get; set; }
+    public string userEmail { get; set; }
+    public bool IsUserLoggedIn = false;
+
+    protected override Task OnInitializedAsync()
+    {
+        shippingCharges = 100;
+        subTotal = 0;
+        paymentMode = "Cash on Delivery";
+
+        return base.OnInitializedAsync();
+    }
+
+    private async Task RemoveFromCart_Click(CartModel cartItem)
+    {
+        myCart.Remove(cartItem);
+        await sessionStorage.SetAsync("myCart", myCart);
+        onQuantityChange();
+
+        await notify.InvokeAsync();
+    }
+
+    private void onQuantityChange()
+    {
+        finalTotal = 0;
+        subTotal = 0;
+        foreach (var cart_item in myCart)
+        {
+            subTotal = subTotal + (cart_item.Price * cart_item.Quantity);
+        }
+        finalTotal = subTotal + shippingCharges;
+    }
+
+    private async Task Checkout_Click()
+    {
+        if (myCart != null && myCart.Count > 0)
+        {
+            myCart.FirstOrDefault().ShippingAddress = shippingAddress;
+            myCart.FirstOrDefault().ShippingCharges = shippingCharges;
+            myCart.FirstOrDefault().SubTotal = subTotal;
+            myCart.FirstOrDefault().PaymentMode = paymentMode;
+
+            var session_userKey = await sessionStorage.GetAsync<string>("userKey");
+            if (session_userKey.Success)
+            {
+                myCart.FirstOrDefault().UserId = Convert.ToInt32(session_userKey.Value);
+            }
+
+            await sessionStorage.SetAsync("myCart", myCart);
+
+            IsUserLoggedIn = await userPanelService.IsUserLoggedIn();
+            if (IsUserLoggedIn)
+            {
+                var response = await userPanelService.Checkout(myCart);
+                if (response != null)
+                {
+                    myCart.Clear();
+                    await sessionStorage.SetAsync("myCart", myCart);
+                    await sessionStorage.SetAsync("latestOrder", response.Message);
+                    await notify.InvokeAsync();
+                    navManager.NavigateTo("myaccount");
+                }
+            }
+            else
+            {
+                await sessionStorage.SetAsync("checkoutAlert", "** Note : Login / Register to place your order !!");
+                navManager.NavigateTo("login");
+            }
+        }
+    }
+
+    private async Task Clear_Click()
+    {
+        myCart = new List<CartModel>();
+        await sessionStorage.DeleteAsync("myCart");
+        await notify.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var result = await sessionStorage.GetAsync<List<CartModel>>("myCart");
+            if (result.Success)
+            {
+                myCart = result.Value;
+                foreach (var cart_item in myCart)
+                {
+                    subTotal = subTotal + (cart_item.Price * cart_item.Quantity);
+                }
+
+                if (myCart != null && myCart.Count > 0)
+                {
+                    shippingAddress = myCart.FirstOrDefault().ShippingAddress;
+                }
+            }
+
+            finalTotal = subTotal + shippingCharges;
+
+            var session_userName = await sessionStorage.GetAsync<string>("userName");
+            var session_userEmail = await sessionStorage.GetAsync<string>("userEmail");
+            if (session_userName.Success && session_userEmail.Success)
+            {
+                userName = session_userName.Value;
+                userEmail = session_userEmail.Value;
+            }
+
+            StateHasChanged();
+        }
+    }
+
+}

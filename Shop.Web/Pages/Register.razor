@@ -1,0 +1,184 @@
+﻿@page "/register"
+@using Shop.DataModels.CustomModels;
+@using Shop.Web.Services;
+@inject IUserPanelService userPanelService
+@inject ProtectedSessionStorage sessionStorage;
+@inject NavigationManager navManager;
+
+    <style>
+        .loginBox {
+            font-family: 'Open Sans', sans-serif;
+            margin: 0 auto 0 auto;
+            width: 100%;
+            text-align: center;
+            margin: 20px 0px 20px 0px;
+        }
+
+        p {
+            font-size: 12px;
+            text-decoration: none;
+            color: white;
+        }
+
+        h1 {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #5da9ca;
+            margin: 2px;
+        }
+
+        .box {
+            background: #2a3135;
+            width: 300px;
+            border-radius: 6px;
+            margin: 0 auto 0 auto;
+            padding: 0px 0px 70px 0px;
+            border: 10px solid;
+        }
+
+        .email {
+            background: #ffffff;
+            border: #ccc 1px solid;
+            border-bottom: #ccc 2px solid;
+            padding: 8px;
+            width: 250px;
+            color: #525252;
+            margin-top: 10px;
+            font-size: 1em;
+            border-radius: 4px;
+        }
+
+        .password {
+            border-radius: 4px;
+            background: #ecf0f1;
+            border: #ccc 1px solid;
+            padding: 8px;
+            width: 250px;
+            font-size: 1em;
+        }
+
+        .btn {
+            background: #2ecc71;
+            width: 125px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            color: white;
+            border-radius: 4px;
+            border: #27ae60 1px solid;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            float: left;
+            margin-left: 16px;
+            font-weight: 800;
+            font-size: 0.8em;
+        }
+
+            .btn:hover {
+                background: #2CC06B;
+            }
+
+        #btn2 {
+            float: left;
+            background: #3498db;
+            width: 125px;
+            padding-top: 5px;
+            padding-bottom: 5px;
+            color: white;
+            border-radius: 4px;
+            border: #2980b9 1px solid;
+            margin-top: 20px;
+            margin-bottom: 20px;
+            margin-left: 10px;
+            font-weight: 800;
+            font-size: 0.8em;
+        }
+
+            #btn2:hover {
+                background: #3594D2;
+            }
+    </style>
+
+    <div style="min-height: 400px;">
+
+        <div class="loginBox">
+            <div class="box">
+                <h1>Register</h1>
+                <EditForm Model="@registerModel" OnValidSubmit="Register_Click">
+                    <DataAnnotationsValidator />
+                    <InputText type="text" name="email" placeholder="Name" class="email" @bind-Value="registerModel.Name" autocomplete="off" />
+                    <ValidationMessage For="@(() => registerModel.Name)" />
+
+                    <InputText type="email" name="email" class="email" placeholder="email" @bind-Value="registerModel.EmailId" autocomplete="off" />
+                    <ValidationMessage For="@(() => registerModel.EmailId)" />
+
+                    <InputText type="password" name="email" class="email" placeholder="password" @bind-Value="registerModel.Password" />
+                    <ValidationMessage For="@(() => registerModel.Password)" />
+
+                    <input type="submit" class="btn" value="Register" />
+                    <a href="login"><div id="btn2">Login</div></a>
+
+                </EditForm>
+
+            </div>
+            <div>
+                <br />
+                <br />
+                <p style="color:#e52e50">
+                    <h4> @alertMessage </h4>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    @code {
+        [CascadingParameter]
+        public EventCallback notify { get; set; }
+
+        public RegisterModel registerModel { get; set; }
+        public string alertMessage { get; set; }
+
+        protected override Task OnInitializedAsync()
+        {
+            registerModel = new RegisterModel();
+            return base.OnInitializedAsync();
+        }
+
+        private async Task Register_Click()
+        {
+            var response = await userPanelService.RegisterUser(registerModel);
+            if (response.Status)
+            {
+                var user_response = response.Message.Split("|");
+                await sessionStorage.SetAsync("userKey", user_response[0]);
+                await sessionStorage.SetAsync("userName", user_response[1]);
+                await sessionStorage.SetAsync("userEmail", user_response[2]);
+                await notify.InvokeAsync();
+                navManager.NavigateTo("/");
+            }
+            else
+            {
+                alertMessage = response.Message;
+            }
+        }
+
+
+        protected override async Task OnAfterRenderAsync(bool firstRender)
+        {
+            if (firstRender)
+            {
+                var login_session = await userPanelService.IsUserLoggedIn();
+                if (login_session)
+                {
+                    navManager.NavigateTo("/");
+                }
+
+                var checkout_session = await sessionStorage.GetAsync<string>("checkoutAlert");
+                if (checkout_session.Success)
+                {
+                    this.alertMessage = checkout_session.Value;
+                    StateHasChanged();
+                }
+            }
+        }
+
+    }

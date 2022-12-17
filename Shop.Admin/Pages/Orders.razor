@@ -1,0 +1,17 @@
+﻿@page "/orders"
+
+<h3>Orders</h3>
+
+@code {
+
+    [CascadingParameter]
+    public EventCallback notify { get; set; }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await notify.InvokeAsync();
+        }
+    }
+}
